@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FlashMonitor</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --brand:        #1664FF;
+  --brand-hover:  #4080FF;
+  --brand-light:  #E8F0FF;
+  --bg:           #F2F3F5;
+  --card:         #FFFFFF;
+  --sidebar-bg:   #FFFFFF;
+  --text-1:       #1D2129;
+  --text-2:       #4E5969;
+  --text-3:       #86909C;
+  --border:       #E5E8EF;
+  --success:      #00B42A;
+  --error:        #F53F3F;
+  --shadow:       0 2px 12px rgba(0,0,0,0.08);
+  --sidebar-w:    260px;
+  --header-h:     56px;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text-1);
+  min-height: 100vh;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+header {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  height: var(--header-h);
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 14px;
+  padding: 0 20px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.hamburger {
+  background: none; border: none; font-size: 1.15rem; cursor: pointer;
+  color: var(--text-2); padding: 6px 8px; border-radius: 6px;
+  transition: background 0.15s, color 0.15s; line-height: 1; flex-shrink: 0;
+}
+.hamburger:hover { background: var(--brand-light); color: var(--brand); }
+header h1 { font-size: 1.1rem; font-weight: 700; color: var(--text-1); }
+header h1 .accent { color: var(--brand); }
+.header-sub { color: var(--text-3); font-size: 0.82rem; }
+
+/* ── Sidebar ─────────────────────────────────────────────────────────────── */
+.sidebar {
+  position: fixed; top: var(--header-h); left: 0; bottom: 0;
+  width: var(--sidebar-w); z-index: 90;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--border);
+  box-shadow: 2px 0 10px rgba(0,0,0,0.07);
+  transform: translateX(calc(-1 * var(--sidebar-w)));
+  transition: transform 0.25s ease;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.sidebar.open { transform: translateX(0); }
+.sidebar-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.sidebar-head span { font-size: 0.85rem; font-weight: 600; color: var(--text-1); }
+.sidebar-close {
+  background: none; border: none; font-size: 1.2rem; cursor: pointer;
+  color: var(--text-3); padding: 2px 6px; border-radius: 4px; transition: background 0.15s;
+}
+.sidebar-close:hover { background: var(--bg); color: var(--text-1); }
+.sidebar-refresh-wrap {
+  padding: 10px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.sidebar-body { flex: 1; overflow-y: auto; padding: 6px 0; }
+.sidebar-empty { padding: 20px 16px; color: var(--text-3); font-size: 0.82rem; text-align: center; }
+
+/* Sidebar package group */
+.pkg-group { margin-bottom: 1px; }
+.pkg-toggle {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 14px; cursor: pointer; user-select: none; transition: background 0.12s;
+}
+.pkg-toggle:hover { background: var(--bg); }
+.pkg-toggle-name { font-size: 0.84rem; font-weight: 600; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pkg-toggle-meta { font-size: 0.74rem; color: var(--text-3); display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+.pkg-arrow { font-size: 0.65rem; transition: transform 0.2s; }
+.pkg-group.expanded .pkg-arrow { transform: rotate(90deg); }
+.pkg-tables-wrap { display: none; padding: 3px 12px 8px 28px; }
+.pkg-group.expanded .pkg-tables-wrap { display: block; }
+.batch-chip {
+  display: inline-block; margin: 3px 3px 3px 0;
+  padding: 3px 10px; font-size: 0.76rem;
+  background: var(--brand-light); color: var(--brand);
+  border-radius: 12px; cursor: pointer; border: 1px solid transparent;
+  transition: all 0.12s; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.batch-chip:hover { background: var(--brand); color: #fff; }
+
+/* ── Main content ──────────────────────────────────────────────────────────── */
+.main-wrap {
+  margin-top: var(--header-h); margin-left: 0;
+  transition: margin-left 0.25s ease;
+  padding: 22px 24px; min-height: calc(100vh - var(--header-h));
+}
+.main-wrap.pushed { margin-left: var(--sidebar-w); }
+
+/* ── Card grid ─────────────────────────────────────────────────────────────── */
+.card-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr);
+  gap: 18px; max-width: 1280px;
+}
+@media (max-width: 860px) { .card-grid { grid-template-columns: 1fr; } }
+
+.card {
+  background: var(--card); border-radius: 10px;
+  box-shadow: var(--shadow); border: 1px solid var(--border);
+  overflow: hidden; display: flex; flex-direction: column;
+}
+.card-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 13px 18px; background: var(--brand-light);
+  border-bottom: 1px solid #d3e2ff; flex-shrink: 0;
+}
+.card-icon { font-size: 1rem; }
+.card-title { font-size: 0.93rem; font-weight: 700; color: var(--brand); }
+.card-body { padding: 16px 18px; flex: 1; }
+
+/* ── Form elements ─────────────────────────────────────────────────────────── */
+.form-group { margin-bottom: 12px; }
+.form-group:last-child { margin-bottom: 0; }
+label { display: block; font-size: 0.78rem; color: var(--text-2); margin-bottom: 4px; font-weight: 500; }
+.label-opt { color: var(--text-3); font-weight: 400; }
+input[type=text], input[type=number], select {
+  width: 100%; padding: 7px 10px;
+  background: #fff; border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text-1); font-size: 0.87rem;
+  outline: none; transition: border-color 0.15s, box-shadow 0.15s;
+}
+input[type=text]:focus, input[type=number]:focus, select:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 2px rgba(22,100,255,0.13);
+}
+select option { background: #fff; }
+.row-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* Tag input */
+.tag-input-wrap {
+  display: flex; flex-wrap: wrap; gap: 5px;
+  padding: 6px 10px; background: #fff;
+  border: 1px solid var(--border); border-radius: 6px;
+  min-height: 38px; align-items: center;
+  transition: border-color 0.15s, box-shadow 0.15s; cursor: text;
+}
+.tag-input-wrap:focus-within { border-color: var(--brand); box-shadow: 0 0 0 2px rgba(22,100,255,0.13); }
+.tag {
+  background: var(--brand); color: #fff;
+  padding: 2px 8px; border-radius: 10px;
+  font-size: 0.77rem; display: flex; align-items: center; gap: 4px;
+}
+.tag-remove { cursor: pointer; font-size: 1rem; line-height: 1; opacity: 0.75; }
+.tag-remove:hover { opacity: 1; }
+.tag-input { border: none; background: transparent; color: var(--text-1); font-size: 0.87rem; outline: none; flex: 1; min-width: 80px; }
+
+/* File drop */
+.file-drop {
+  border: 2px dashed var(--border); border-radius: 8px;
+  padding: 16px; text-align: center; cursor: pointer; transition: all 0.15s;
+}
+.file-drop:hover, .file-drop.drag { border-color: var(--brand); background: var(--brand-light); }
+.file-drop input { display: none; }
+.file-drop p { color: var(--text-3); font-size: 0.83rem; }
+.file-drop .filename { color: var(--brand); margin-top: 5px; font-size: 0.81rem; font-weight: 500; }
+
+/* Buttons */
+.btn {
+  padding: 8px 18px; background: var(--brand); color: #fff;
+  border: none; border-radius: 6px; font-size: 0.87rem;
+  cursor: pointer; font-weight: 600; transition: background 0.15s;
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.btn:hover { background: var(--brand-hover); }
+.btn-sm { padding: 5px 12px; font-size: 0.8rem; }
+.btn-ghost { background: var(--bg); color: var(--text-1); border: 1px solid var(--border); }
+.btn-ghost:hover { background: var(--border); }
+
+/* Alerts */
+.alert { padding: 9px 13px; border-radius: 6px; margin-top: 10px; font-size: 0.83rem; }
+.alert-error   { background: rgba(245,63,63,0.08);  border: 1px solid rgba(245,63,63,0.3);  color: #c41a1a; }
+.alert-success { background: rgba(0,180,42,0.08);   border: 1px solid rgba(0,180,42,0.25);  color: #007a1c; }
+
+/* Result box */
+.result-box {
+  margin-top: 12px; background: var(--bg);
+  border: 1px solid var(--border); border-radius: 8px; padding: 12px;
+}
+.result-header { font-size: 0.77rem; color: var(--text-3); margin-bottom: 6px; }
+pre {
+  white-space: pre-wrap; word-break: break-all;
+  font-size: 0.79rem; color: var(--text-2);
+  font-family: 'Consolas', 'Courier New', monospace;
+}
+.download-link {
+  display: inline-block; margin-top: 7px; color: var(--brand);
+  font-size: 0.82rem; text-decoration: none; font-weight: 500;
+}
+.download-link:hover { text-decoration: underline; }
+
+/* Spinner */
+.spinner {
+  display: inline-block; width: 13px; height: 13px;
+  border: 2px solid rgba(22,100,255,0.2); border-top-color: var(--brand);
+  border-radius: 50%; animation: spin 0.8s linear infinite;
+  vertical-align: middle; margin-right: 4px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Hint text */
+.hint { font-size: 0.74rem; color: var(--text-3); margin-top: 3px; }
+
+/* Log entries */
+.log-entry { font-size: 0.76rem; padding: 3px 0; border-bottom: 1px solid var(--border); }
+.log-INFO  { color: var(--text-2); }
+.log-WARN  { color: #b85c00; }
+.log-ERROR { color: var(--error); }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════ HEADER ══════════════════════════════════════════════ -->
+<header>
+  <button class="hamburger" id="hamburger-btn" onclick="toggleSidebar()" title="展开数据库表">☰</button>
+  <h1>⚡ Flash<span class="accent">Monitor</span></h1>
+  <span class="header-sub">Flash用量监控数据库</span>
+</header>
+
+<!-- ═══════════════════ SIDEBAR ═════════════════════════════════════════════ -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-head">
+    <span>数据库表</span>
+    <button class="sidebar-close" onclick="toggleSidebar()" title="关闭">×</button>
+  </div>
+  <div class="sidebar-refresh-wrap">
+    <button class="btn btn-sm btn-ghost" onclick="loadSidebar()">刷新</button>
+  </div>
+  <div class="sidebar-body" id="sidebar-content">
+    <div class="sidebar-empty">点击「刷新」加载数据</div>
+  </div>
+</aside>
+
+<!-- ═══════════════════ MAIN CONTENT ════════════════════════════════════════ -->
+<div class="main-wrap" id="main-wrap">
+  <div class="card-grid">
+
+    <!-- ─── Import CSV ─────────────────────────────────────────────────── -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">导入Flash用量数据</span>
+      </div>
+      <div class="card-body">
+        <div class="form-group">
+          <label>包名</label>
+          <input type="text" id="imp-pkg" placeholder="SPC_M">
+        </div>
+        <div class="form-group">
+          <label>版本号 <span class="label-opt">(optional — defaults to timestamp)</span></label>
+          <input type="text" id="imp-table" placeholder="26A">
+        </div>
+        <div class="form-group">
+          <label>CSV File</label>
+          <div class="file-drop" id="imp-drop"
+            onclick="document.getElementById('imp-file').click()"
+            ondragover="event.preventDefault();this.classList.add('drag')"
+            ondragleave="this.classList.remove('drag')"
+            ondrop="handleDrop(event,'imp-file','imp-filename')">
+            <input type="file" id="imp-file" accept=".csv" onchange="showFilename('imp-file','imp-filename')">
+            <p>Click to browse or drag &amp; drop a CSV file</p>
+            <div class="filename" id="imp-filename"></div>
+          </div>
+        </div>
+        <button class="btn" onclick="doImport()">导入</button>
+        <div id="imp-result"></div>
+      </div>
+    </div>
+
+    <!-- ─── Compare All Files ─────────────────────────────────────────── -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">对比所有文件</span>
+      </div>
+      <div class="card-body">
+        <div class="form-group">
+          <label>包名</label>
+          <input type="text" id="ca-pkg" placeholder="SPC_M">
+        </div>
+        <div class="row-grid">
+          <div class="form-group">
+            <label>旧用量记录</label>
+            <input type="text" id="ca-t1" placeholder="25B">
+          </div>
+          <div class="form-group">
+            <label>新用量记录</label>
+            <input type="text" id="ca-t2" placeholder="26A">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>输出路径<span class="label-opt">(optional)</span></label>
+          <input type="text" id="ca-out" placeholder="">
+        </div>
+        <button class="btn" onclick="doCompareAll()">输出</button>
+        <div id="ca-result"></div>
+      </div>
+    </div>
+
+    <!-- ─── Compare Top N ─────────────────────────────────────────────── -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">对比TopN</span>
+      </div>
+      <div class="card-body">
+        <div class="form-group">
+          <label>包名</label>
+          <input type="text" id="ct-pkg" placeholder="SPC_M">
+        </div>
+        <div class="row-grid">
+          <div class="form-group">
+            <label>旧用量记录</label>
+            <input type="text" id="ct-t1" placeholder="25B">
+          </div>
+          <div class="form-group">
+            <label>新用量记录</label>
+            <input type="text" id="ct-t2" placeholder="26A">
+          </div>
+        </div>
+        <div class="row-grid">
+          <div class="form-group">
+            <label>TopN</label>
+            <input type="number" id="ct-n" value="100" min="1">
+          </div>
+          <div class="form-group">
+            <label>输出格式</label>
+            <select id="ct-fmt">
+              <option value="csv">CSV</option>
+              <option value="html">HTML</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>输出路径<span class="label-opt">(optional)</span></label>
+          <input type="text" id="ct-out" placeholder="">
+        </div>
+        <button class="btn" onclick="doCompareTopN()">输出</button>
+        <div id="ct-result"></div>
+      </div>
+    </div>
+
+    <!-- ─── Time Series Analysis ──────────────────────────────────────── -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">文件大小历史变化</span>
+      </div>
+      <div class="card-body">
+        <div class="form-group">
+          <label>包名</label>
+          <input type="text" id="ts-pkg" placeholder="SPC_M">
+        </div>
+        <div class="form-group">
+          <label>文件名<span class="label-opt">(支持正则表达式批量选取)</span></label>
+          <input type="text" id="ts-pattern" placeholder="e.g. .*\.o$">
+        </div>
+        <div class="form-group">
+          <label>用量记录<span class="label-opt"></span></label>
+          <div class="tag-input-wrap" id="ts-tags-wrap" onclick="document.getElementById('ts-tag-input').focus()">
+            <input class="tag-input" id="ts-tag-input" placeholder="输入用量表名，按回车确认"
+              onkeydown="handleTagInput(event,'ts-tags-wrap','ts-tag-input')">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>输出路径<span class="label-opt">(optional)</span></label>
+          <input type="text" id="ts-out" placeholder="">
+        </div>
+        <button class="btn" onclick="doTimeSeries()">输出</button>
+        <div id="ts-result"></div>
+      </div>
+    </div>
+
+    <!-- ─── External CSV Compare ──────────────────────────────────────── -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">对比本地用量</span>
+      </div>
+      <div class="card-body">
+        <div class="form-group">
+          <label>包名</label>
+          <input type="text" id="ext-pkg" placeholder="SPC_M">
+        </div>
+        <div class="form-group">
+          <label>DB Batch Name</label>
+          <input type="text" id="ext-table" placeholder="25B">
+        </div>
+        <div class="form-group">
+          <label>本地用量CSV路径</label>
+          <input type="text" id="ext-spath" placeholder=".\SPC_M_26A.csv">
+          <div class="hint">The CSV file must be accessible from the server filesystem!!!</div>
+        </div>
+        <div class="row-grid">
+          <div class="form-group">
+            <label>TopN <span class="label-opt">(0 = all)</span></label>
+            <input type="number" id="ext-n" value="0" min="0">
+          </div>
+          <div class="form-group">
+            <label>输出格式</label>
+            <select id="ext-fmt" onchange="onExtFmtChange()">
+              <option value="csv">CSV</option>
+              <option value="html">HTML</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>输出路径<span class="label-opt">(optional)</span></label>
+          <input type="text" id="ext-out" placeholder="">
+        </div>
+        <button class="btn" onclick="doExternal()">输出</button>
+        <div id="ext-result"></div>
+      </div>
+    </div>
+
+    <!-- ─── System Logs ───────────────────────────────────────────────── -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">System Logs</span>
+      </div>
+      <div class="card-body">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
+          <input type="number" id="log-n" value="50" min="1" max="1000" style="width:90px;">
+          <span style="color:var(--text-3);font-size:0.82rem;">entries</span>
+          <button class="btn" onclick="doGetLogs()">Refresh</button>
+        </div>
+        <div id="log-result"></div>
+      </div>
+    </div>
+
+    <!-- ─── Export Table ──────────────────────────────────────────────── -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">导出用量表</span>
+      </div>
+      <div class="card-body">
+        <div class="form-group">
+          <label>包名</label>
+          <input type="text" id="exp-pkg" placeholder="SPC_M">
+        </div>
+        <div class="form-group">
+          <label>版本号</label>
+          <input type="text" id="exp-table" placeholder="26A">
+        </div>
+        <div class="form-group">
+          <label>输出路径<span class="label-opt">(optional)</span></label>
+          <input type="text" id="exp-out" placeholder="">
+        </div>
+        <button class="btn" onclick="doExportTable()">导出</button>
+        <div id="exp-result"></div>
+      </div>
+    </div>
+
+    <!-- ─── Delete Table ──────────────────────────────────────────────── -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">删除用量表</span>
+      </div>
+      <div class="card-body">
+        <div class="form-group">
+          <label>包名</label>
+          <input type="text" id="del-pkg" placeholder="SPC_M">
+        </div>
+        <div class="form-group">
+          <label>版本号</label>
+          <input type="text" id="del-table" placeholder="26A">
+        </div>
+        <button class="btn" style="background:var(--error)" onclick="doDeleteTable()">删除</button>
+        <div id="del-result"></div>
+      </div>
+    </div>
+
+  </div><!-- /.card-grid -->
+</div><!-- /.main-wrap -->
+
+<script>
+
+let sidebarOpen = false;
+
+function toggleSidebar() {
+  sidebarOpen = !sidebarOpen;
+  document.getElementById('sidebar').classList.toggle('open', sidebarOpen);
+  document.getElementById('main-wrap').classList.toggle('pushed', sidebarOpen);
+  if (sidebarOpen) loadSidebar();
+}
+
+async function loadSidebar() {
+  const el = document.getElementById('sidebar-content');
+  el.innerHTML = `<div class="sidebar-empty"><span class="spinner"></span> Loading…</div>`;
+  const data = await rpc('flash.listAllPackages', {});
+  if (data.error) {
+    el.innerHTML = `<div class="sidebar-empty" style="color:var(--error)">${escHtml(data.error.message)}</div>`;
+    return;
+  }
+  const packages = (data.result && data.result.packages) || [];
+  if (packages.length === 0) {
+    el.innerHTML = `<div class="sidebar-empty">暂无数据，请先导入 CSV</div>`;
+    return;
+  }
+  el.innerHTML = packages.map((pkg, i) => {
+    const count = (pkg.tables || []).length;
+    const chips = (pkg.tables || []).map(t =>
+      `<span class="batch-chip" title="${escAttr(t)}" onclick="sidebarFill('${escAttr(pkg.name)}','${escAttr(t)}')">${escHtml(t)}</span>`
+    ).join('');
+    return `
+      <div class="pkg-group" id="pkg-g-${i}">
+        <div class="pkg-toggle" onclick="togglePkg(${i})">
+          <span class="pkg-toggle-name">📦 ${escHtml(pkg.name)}</span>
+          <span class="pkg-toggle-meta">
+            <span>${count}</span>
+            <span class="pkg-arrow">▶</span>
+          </span>
+        </div>
+        <div class="pkg-tables-wrap">${chips || '<span style="color:var(--text-3);font-size:0.77rem;">no batches</span>'}</div>
+      </div>`;
+  }).join('');
+}
+
+function togglePkg(i) {
+  document.getElementById('pkg-g-' + i).classList.toggle('expanded');
+}
+
+// 点击批次标签后，自动将包名和批次名填入所有相关输入框
+function sidebarFill(pkg, table) {
+  ['imp-pkg', 'ca-pkg', 'ct-pkg', 'ts-pkg', 'ext-pkg', 'exp-pkg', 'del-pkg'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = pkg;
+  });
+  ['ca-t2', 'ct-t2', 'ext-table', 'exp-table', 'del-table'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = table;
+  });
+}
+
+let _id = 1;
+async function rpc(method, params) {
+  const resp = await fetch('/rpc', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', method, params, id: _id++ })
+  });
+  return resp.json();
+}
+
+function setResult(id, html) {
+  document.getElementById(id).innerHTML = html;
+}
+
+function errBox(msg) {
+  return `<div class="alert alert-error">⚠ ${escHtml(msg)}</div>`;
+}
+
+function okBox(msg) {
+  return `<div class="alert alert-success">✓ ${escHtml(msg)}</div>`;
+}
+
+function loading() {
+  return `<div style="margin-top:10px;color:var(--text-3);font-size:0.85rem;"><span class="spinner"></span>Working…</div>`;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function escAttr(s) {
+  return String(s).replace(/\\/g,'\\\\').replace(/'/g,'&#39;').replace(/"/g,'&quot;');
+}
+
+async function doImport() {
+  const pkg   = document.getElementById('imp-pkg').value.trim();
+  const table = document.getElementById('imp-table').value.trim();
+  const file  = document.getElementById('imp-file').files[0];
+
+  if (!pkg)  return setResult('imp-result', errBox('Package name is required'));
+  if (!file) return setResult('imp-result', errBox('Please select a CSV file'));
+
+  setResult('imp-result', loading());
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('packageName', pkg);
+    if (table) fd.append('tableName', table);
+
+    const resp = await fetch('/upload', { method: 'POST', body: fd });
+    const data = await resp.json();
+    if (data.error) {
+      setResult('imp-result', errBox(data.error.message));
+    } else {
+      setResult('imp-result', okBox(
+        `Imported ${data.result.rowsInserted} rows into package "${data.result.packageName}" table "${data.result.tableName}"`
+      ));
+      if (sidebarOpen) loadSidebar();
+    }
+  } catch(e) {
+    setResult('imp-result', errBox(e.message));
+  }
+}
+
+async function doCompareAll() {
+  const pkg = document.getElementById('ca-pkg').value.trim();
+  const t1  = document.getElementById('ca-t1').value.trim();
+  const t2  = document.getElementById('ca-t2').value.trim();
+  const out = document.getElementById('ca-out').value.trim();
+  if (!pkg || !t1 || !t2) return setResult('ca-result', errBox('Package name and both batch names are required'));
+
+  setResult('ca-result', loading());
+  const params = { packageName: pkg, tableName1: t1, tableName2: t2 };
+  if (out) params.outputPath = out;
+
+  const data = await rpc('flash.compareAll', params);
+  if (data.error) return setResult('ca-result', errBox(data.error.message));
+
+  const r = data.result;
+  setResult('ca-result', `
+    <div class="alert alert-success">✓ ${r.rows} rows written</div>
+    <div class="result-box">
+      <div class="result-header">Output file</div>
+      <pre>${escHtml(r.outputPath)}</pre>
+    </div>`);
+}
+
+async function doCompareTopN() {
+  const pkg = document.getElementById('ct-pkg').value.trim();
+  const t1  = document.getElementById('ct-t1').value.trim();
+  const t2  = document.getElementById('ct-t2').value.trim();
+  const n   = parseInt(document.getElementById('ct-n').value) || 20;
+  const fmt = document.getElementById('ct-fmt').value;
+  const out = document.getElementById('ct-out').value.trim();
+  if (!pkg || !t1 || !t2) return setResult('ct-result', errBox('All fields are required'));
+
+  setResult('ct-result', loading());
+  const params = { packageName: pkg, tableName1: t1, tableName2: t2, topN: n, outputFormat: fmt };
+  if (out) params.outputPath = out;
+
+  const data = await rpc('flash.compareTopN', params);
+  if (data.error) return setResult('ct-result', errBox(data.error.message));
+
+  const r = data.result;
+  const openLink = fmt === 'html'
+    ? `<a class="download-link" href="/download/${encodeURIComponent(r.outputPath.split(/[\\/]/).pop())}" target="_blank">🔗 Open HTML Report</a>`
+    : '';
+  setResult('ct-result', `
+    <div class="alert alert-success">✓ Top ${n} rows written as ${fmt.toUpperCase()}</div>
+    <div class="result-box">
+      <div class="result-header">Output file</div>
+      <pre>${escHtml(r.outputPath)}</pre>
+      ${openLink}
+    </div>`);
+}
+
+function handleTagInput(event, wrapId, inputId) {
+  const input = document.getElementById(inputId);
+  if (event.key === 'Enter' || event.key === ',') {
+    event.preventDefault();
+    const val = input.value.trim().replace(/,/g, '');
+    if (val) addTag(wrapId, inputId, val);
+    input.value = '';
+  } else if (event.key === 'Backspace' && input.value === '') {
+    const wrap = document.getElementById(wrapId);
+    const tags = wrap.querySelectorAll('.tag');
+    if (tags.length) tags[tags.length - 1].remove();
+  }
+}
+
+function addTag(wrapId, inputId, val) {
+  const wrap  = document.getElementById(wrapId);
+  const input = document.getElementById(inputId);
+  const tag   = document.createElement('span');
+  tag.className    = 'tag';
+  tag.dataset.value = val;
+  tag.innerHTML = `${escHtml(val)}<span class="tag-remove" onclick="this.parentElement.remove()">×</span>`;
+  wrap.insertBefore(tag, input);
+}
+
+function getTags(wrapId) {
+  return Array.from(document.getElementById(wrapId).querySelectorAll('.tag'))
+    .map(t => t.dataset.value);
+}
+
+async function doTimeSeries() {
+  const pkg     = document.getElementById('ts-pkg').value.trim();
+  const pattern = document.getElementById('ts-pattern').value.trim();
+  const tables  = getTags('ts-tags-wrap');
+  const out     = document.getElementById('ts-out').value.trim();
+  if (!pkg)             return setResult('ts-result', errBox('Package name is required'));
+  if (!tables.length)   return setResult('ts-result', errBox('Add at least one table name'));
+
+  setResult('ts-result', loading());
+  const params = { packageName: pkg, tableNames: tables };
+  if (pattern) params.filePattern = pattern;
+  if (out)     params.outputPath  = out;
+
+  const data = await rpc('flash.timeSeries', params);
+  if (data.error) return setResult('ts-result', errBox(data.error.message));
+
+  const r = data.result;
+  setResult('ts-result', `
+    <div class="alert alert-success">✓ ${r.rows} rows written</div>
+    <div class="result-box"><div class="result-header">Output file</div><pre>${escHtml(r.outputPath)}</pre></div>`);
+}
+
+// 切换输出格式时同步调整 TopN 的约束：HTML 模式要求 TopN ≥ 1
+function onExtFmtChange() {
+  const isHtml = document.getElementById('ext-fmt').value === 'html';
+  const nInput = document.getElementById('ext-n');
+  const label  = nInput.closest('.form-group').querySelector('label');
+  if (isHtml) {
+    nInput.min = '1';
+    if (parseInt(nInput.value) <= 0) nInput.value = '20';
+    label.innerHTML = 'TopN <span class="label-opt">(选择HTML格式时需 &gt; 0)</span>';
+  } else {
+    nInput.min = '0';
+    label.innerHTML = 'TopN <span class="label-opt">(0 = all)</span>';
+  }
+}
+
+async function doExternal() {
+  const pkg   = document.getElementById('ext-pkg').value.trim();
+  const table = document.getElementById('ext-table').value.trim();
+  const spath = document.getElementById('ext-spath').value.trim();
+  const n     = parseInt(document.getElementById('ext-n').value) || 0;
+  const fmt   = document.getElementById('ext-fmt').value;
+  const out   = document.getElementById('ext-out').value.trim();
+
+  if (!pkg || !table) return setResult('ext-result', errBox('Package name and batch name are required'));
+  if (!spath)         return setResult('ext-result', errBox('Please provide the server-side path to the external CSV'));
+  if (fmt === 'html' && n <= 0) return setResult('ext-result', errBox('HTML output requires Top N > 0'));
+
+  setResult('ext-result', loading());
+  const params = { packageName: pkg, tableName: table, externalCsvPath: spath, outputFormat: fmt };
+  if (n > 0) params.topN = n;
+  if (out)   params.outputPath = out;
+
+  const data = await rpc('flash.compareExternal', params);
+  if (data.error) return setResult('ext-result', errBox(data.error.message));
+
+  const r = data.result;
+  setResult('ext-result', `
+    <div class="alert alert-success">✓ ${r.rows} rows written as ${(r.format||'csv').toUpperCase()}</div>
+    <div class="result-box"><div class="result-header">Output file</div><pre>${escHtml(r.outputPath)}</pre></div>`);
+}
+
+async function doExportTable() {
+  const pkg   = document.getElementById('exp-pkg').value.trim();
+  const table = document.getElementById('exp-table').value.trim();
+  const out   = document.getElementById('exp-out').value.trim();
+  if (!pkg || !table) return setResult('exp-result', errBox('包名和版本号均为必填项'));
+
+  setResult('exp-result', loading());
+  const params = { packageName: pkg, tableName: table };
+  if (out) params.outputPath = out;
+
+  const data = await rpc('flash.exportTable', params);
+  if (data.error) return setResult('exp-result', errBox(data.error.message));
+
+  const r = data.result;
+  setResult('exp-result', `
+    <div class="alert alert-success">✓ 已导出 ${r.rows} 行</div>
+    <div class="result-box"><div class="result-header">输出文件</div><pre>${escHtml(r.outputPath)}</pre></div>`);
+}
+
+async function doDeleteTable() {
+  const pkg   = document.getElementById('del-pkg').value.trim();
+  const table = document.getElementById('del-table').value.trim();
+  if (!pkg || !table) return setResult('del-result', errBox('包名和版本号均为必填项'));
+
+  if (!confirm(`确认删除 ${pkg} 中的 ${table} 版本用量表？\n此操作不可撤销！`)) return;
+
+  setResult('del-result', loading());
+  const data = await rpc('flash.deleteTable', { packageName: pkg, tableName: table });
+  if (data.error) return setResult('del-result', errBox(data.error.message));
+
+  const r = data.result;
+  setResult('del-result', `<div class="alert alert-success">✓ 已删除 ${r.rowsDeleted} 行</div>`);
+  if (sidebarOpen) loadSidebar();
+}
+
+async function doGetLogs() {
+  const n    = parseInt(document.getElementById('log-n').value) || 50;
+  const data = await rpc('flash.getLogs', { last: n });
+  if (data.error) return setResult('log-result', errBox(data.error.message));
+
+  const entries = data.result.entries || [];
+  if (entries.length === 0) {
+    setResult('log-result', '<div class="alert alert-success">No log entries yet.</div>');
+    return;
+  }
+  const lines = entries.map(e => {
+    const t = new Date(e.time).toLocaleTimeString();
+    return `<div class="log-entry log-${escHtml(e.level)}">[${t}] <strong>${escHtml(e.level)}</strong> ${escHtml(e.message)}</div>`;
+  }).join('');
+  setResult('log-result', `<div class="result-box">${lines}</div>`);
+}
+
+function showFilename(inputId, labelId) {
+  const f = document.getElementById(inputId).files[0];
+  document.getElementById(labelId).textContent = f ? f.name : '';
+}
+
+function handleDrop(event, inputId, labelId) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('drag');
+  const files = event.dataTransfer.files;
+  if (files.length > 0) {
+    const dt = new DataTransfer();
+    dt.items.add(files[0]);
+    document.getElementById(inputId).files = dt.files;
+    document.getElementById(labelId).textContent = files[0].name;
+  }
+}
+</script>
+</body>
+</html>
